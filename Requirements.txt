@@ -1,0 +1,7 @@
+pandas
+psutil
+jupyterlab
+dash
+dash-auth
+dash-table-experiments
+waitress
