@@ -210,11 +210,6 @@ while True:
     types = [str, str, str, str, str, safedelta, bool, safedelta, str, safetime]
     tasks = handy.havecols(tasks, cols, fill = '', types = types)
     
-    # Cycle
-    tasks = tasks.assign(cycle   = cycle)
-    tasks = tasks.assign(timeout = tasks.timeout.apply(lambda t: t.total_seconds()))
-    tasks = tasks.assign(timeout = tasks.timeout.astype(int))
-
     # Compute execution policy by timing
     def replicate_by_timing(task):
         # task = tasks.iloc[1]
@@ -224,7 +219,15 @@ while True:
         return replicates
 
     tasks = [replicate_by_timing(row) for i, row in tasks.iterrows()]
-    tasks = pd.concat(tasks)
+    tasks = pd.concat(tasks + [pd.DataFrame()])
+    
+    # Reinstate all columns (empty tasks results in loss of all columns)
+    tasks = handy.havecols(tasks, cols, fill = '', types = types)
+
+    # Cycle
+    tasks = tasks.assign(cycle   = cycle)
+    tasks = tasks.assign(timeout = tasks.timeout.apply(lambda t: t.total_seconds()))
+    tasks = tasks.assign(timeout = tasks.timeout.astype(int))
     
     # Determine execution policy per row
     idx_disabled   = tasks.timing.str.match('\\-')
