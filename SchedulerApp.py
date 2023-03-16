@@ -14,7 +14,7 @@ import handy
 import dashboard
 
 # Dashboard
-from dashboard import body, box, btn, btn2, clock, datatable, dcc, dropdown, form, formitem, go, hidden, html, Input
+from dashboard import body, box, block, btn, btn2, clock, datatable, dcc, dropdown, form, formitem, go, hidden, html, Input
 from dashboard import make_datatable, make_options, menu, menuitem
 from dashboard import on, onclick, onplotclick, onrows, ontick
 from dashboard import page, plotly, row, rowsof
@@ -40,12 +40,9 @@ plchldr = {
     'name':     'name: MyProject_MyScript',
     'path':    r'path: C:\Python\MyProject',
     'script':   'script: MyScript.py',
-    'execute':  'execute: interval (scripts), continuous (apps)',
-    'interval': 'interval: 30 sec, 5 min, 2 hour',
+    'timing':    'timing: 11:15 (space separated)', 
     'delay':    'delay: 30 sec, 5 min, 2 hour',
     'timeout':  'timeout: 30 sec, 5 min, 2 hour',
-    'email':    'email: mailbox@email.com',
-    'notify':   'notify: all, once or none'
 }
 
 # %% App Layout
@@ -54,7 +51,7 @@ app = dashboard.app(users = setup.users, title = setup.title)
 
 def make_task(task = {}):
 
-    default = {'name': '', 'path': '', 'script': '', 'execute': '', 'interval': '', 'delay': '', 'timeout': '', 'email': '', 'notify': ''}
+    default = {'name': '', 'path': '', 'script': '', 'execute': '', 'timing': '','interval': '', 'delay': '', 'timeout': ''}
     
     for key in default.keys():
         if not key in task:
@@ -64,19 +61,12 @@ def make_task(task = {}):
             
     content = [
         
-        formitem(None, textinput(id = 'name',   value = task['name'],   placeholder = plchldr['name']),     width = 12),
-        formitem(None, textinput(id = 'email',  value = task['email'],  placeholder = plchldr['email']),    width = 8),
-        formitem(None, dropdown(id = 'notify', value = task['notify'],  placeholder = plchldr['notify'], options = notify_opts),    width = 4),
-
-        formitem(None, textinput(id = 'path',   value = task['path'],   placeholder = plchldr['path']),     width = 12),
-        formitem(None, textinput(id = 'script', value = task['script'], placeholder = plchldr['script']),   width = 8),
-        
-        formitem(None, html.A(id = 'link', href = '/', target = '_blank', children = btn2(id = None, name = 'JupyterLab', color = 'success')), width = 4),
-        
-        formitem(None, dropdown (id = 'execute',  value = task['execute'],  placeholder = plchldr['execute'],   options = make_options(['interval', 'continuous', 'disabled'])), width = 12),
-        formitem(None, textinput(id = 'interval', value = task['interval'], placeholder = plchldr['interval']), width = 4),
-        formitem(None, textinput(id = 'delay',    value = task['delay'],    placeholder = plchldr['delay']),    width = 4),
-        formitem(None, textinput(id = 'timeout',  value = task['timeout'],  placeholder = plchldr['timeout']),  width = 4),
+        formitem(None, textinput(id = 'name',     value = task['name'],     placeholder = plchldr['name']),    width = 12),
+        formitem(None, textinput(id = 'path',     value = task['path'],     placeholder = plchldr['path']),    width = 12),
+        formitem(None, textinput(id = 'script',   value = task['script'],   placeholder = plchldr['script']),  width = 12),
+        formitem(None, textinput(id = 'timing',    value = task['timing'],    placeholder = plchldr['timing']),   width = 12),
+        formitem(None, textinput(id = 'delay',    value = task['delay'],    placeholder = plchldr['delay']),   width = 6),
+        formitem(None, textinput(id = 'timeout',  value = task['timeout'],  placeholder = plchldr['timeout']), width = 6),
                 
     ]
     return content
@@ -96,43 +86,51 @@ app.layout = page(
         # Plot states
         row([
                          
-            box(None, 3, content = [
+            box('Add or Edit Task', 3, content = [
                 
-                #datatable(id = 'tasks', max_rows_in_viewport = 3),
                 form(id = '', content = [
                     formitem(None, dropdown(id = 'tasks')),
                     formitem(None, btn('refresh_tasks', 'Refresh')),
                 ]),
-                
-                html.Hr(),
-                
+                                
                 form(id = 'task', content = make_task()),
                 form(id = '', content = [
-                    formitem(None, btn('save', 'save'), width = 4),
-                    formitem(None, btn('kill', 'kill', color = 'warning'), width = 4),
-                    formitem(None, btn('del',  'del', color = 'danger'),  width = 4),
-                    formitem(None, [ html.Div(id = 'do_kill'), html.Div(id = 'do_save'), html.Div(id = 'do_del') ], width = 12),
+                    formitem(None, btn('save', 'save'), width = 6),
+                    formitem(None, btn('del',  'del', color = 'danger'),  width = 6),
                 ]),
                 
                 html.Hr(),
-                form(id = '', content = [
-                    formitem(None, textarea(id = 'log', placeholder = '')),
-                    formitem(None, btn('refresh_log', 'Refresh')),                    
-                ])
+                
+                html.Div(id = 'do_kill'), html.Div(id = 'do_save'), html.Div(id = 'do_del')
+
+            ]),
+            
+            block(9, [
+
+                row([
+                    box('Run History', 12, [
+                        dcc.Graph(id = 'plot'),
+                        html.Hr(),
+                        form(id = '', content = [
+                            formitem(None, btn('refresh_plot', 'Refresh'), width = 2),
+                            formitem(None, dropdown(id = 'window', options = make_options(['1H', '8H', '24H']), value = '1H'), width = 2),
+                        ]),
+                    ]),
+                ]),
+
+                row([
+                    box('Task Logging', 12, [
+                        form(id = '', content = [
+                            formitem(None, textarea(id = 'log', placeholder = '')),
+                            formitem(None, btn('refresh_log', 'Refresh')),
+                            formitem(None, btn('kill', 'kill', color = 'warning')),
+                        ]),
+                    ]),
+                ]),
                 
             ]),
             
-            box(None, 9, [
-                dcc.Graph(id = 'plot'),
-                html.Hr(),
-                form(id = '', content = [
-                    formitem(None, btn('refresh_plot', 'Refresh'), width = 2),
-                    formitem(None, dropdown(id = 'window', options = make_options(['1H', '8H', '24H']), value = '1H'), width = 2),
-                ])
-            ]),
-            
-        ]),
-                
+        ]),                
         
         clock(id = 'timer', interval =  30 * 1000)
 
@@ -184,39 +182,26 @@ def do_save(inputs):
     
     task = {
         'name':      inputs['name'],
-        'execute':   inputs['execute'],
-        'email':     inputs['email'],
-        'notify':    inputs['notify'],
-        'interval':  inputs['interval'],
+        'timing':    inputs['timing'],
         'delay':     inputs['delay'],
         'path':      inputs['path'],
         'script':    inputs['script'],
         'timeout':   inputs['timeout']        
     }
         
-    freq = '^([0-9]+)([ ]?)(sec|seconds|min|minutes|hour|hours)$'
+    freq = '[0-9]{1,2} ?h|[0-9]{1,2} ?min|[0-9]{1,2} ?s'
     
     if re.match('^([a-z0-9_]+)$', task['name'], re.IGNORECASE) is None:
         return 'invalid name: try something like "Project001_MyScript" or "MyProject_Script01"'
-
-    if re.match('interval|continuous|disabled', task['execute'], re.IGNORECASE) is None:
-        return 'invalid execute: try "interval" or "continuous" or "disabled"'
-
-    regex = '^([a-z\.]+)@gmail.com$'
-    if re.match(regex, task['email'], re.IGNORECASE) is None:
-        return 'invalid email: for now only 1 email address'
-
-    if re.match('all|once|none', task['notify'], re.IGNORECASE) is None:
-        return 'invalid notify: try "all" or "once" or "none"'
     
-    if re.match(freq, task['interval'], re.IGNORECASE) is None:
-        return 'invalid interval frequency: try "5 mins" or "1 hour"'
-
-    if re.match(freq, task['delay'], re.IGNORECASE) is None:
-        return 'invalid delay frequency: try "5 mins" or "1 hour"'
+    if re.match('^(([*-]|[0-9]{1,2}:[0-9]{2}|' + freq + ') ?)+$', task['timing'], re.IGNORECASE) is None:
+        return 'invalid timing: try something like "11:15", "2 h" or "1 min" or "30 s". To disable use "-" and to run as service "*"'
     
-    if re.match(freq, task['timeout'], re.IGNORECASE) is None:
-        return 'invalid timeout: try "5 mins" or "1 hour"'
+    if re.match('^' + freq + '$', task['delay'], re.IGNORECASE) is None:
+        return 'invalid delay frequency: try "10 s", "5 min" or "1 h"'
+    
+    if re.match('^' + freq + '$', task['timeout'], re.IGNORECASE) is None:
+        return 'invalid timeout: try "10 s", "5 min" or "1 h"'
     
     if not os.path.isdir(task['path']):
         return 'could not find path folder: select other folder'
@@ -322,17 +307,6 @@ def set_log(inputs):
     return ''
 
 
-# Set link to edit script in JupyterLab
-def set_link(inputs):
-    path     = inputs['path']
-    script   = inputs['script']
-    if not setup.jupyter_folder in path: return setup.jupyter_url
-    relpath = path[(len(setup.jupyter_folder) + 1):]
-    relpath = relpath.replace('\\', '/')
-    link = f'{setup.jupyter_url}/{relpath}/{script}'
-    return link
-
-
 # time = pd.Timestamp('now', tz = 'CET')
 def humanize(time):
     try:
@@ -405,19 +379,12 @@ app.do(
     using = valueof('name')
 )
 
-# Create link
-app.do(
-    on  = on('path') + on('script'),
-    set = setlink('link'), 
-    to  = set_link
-)
-
 # Save task
 app.do(
     on  = onclick('save'), 
     set = setcontent('do_save'),
     to  = do_save,
-    using = valueof('name') + valueof('execute') + valueof('email') + valueof('notify') + valueof('interval') + valueof('delay') + valueof('path') + valueof('script') + valueof('timeout')
+    using = valueof('name') + valueof('timing') + valueof('delay') + valueof('path') + valueof('script') + valueof('timeout')
 )
 
 # Delete task
@@ -442,4 +409,4 @@ app.do(
 #if setup.testing: app.run_server(host = setup.host, port = setup.port + 1000, debug = False)
 #else: waitress.serve(app.server, host = setup.host, port = setup.port, threads = setup.threads)
 
-app.run_server(host = setup.host, port = setup.port, debug = False)
+app.run_server(host = setup.host, port = setup.port, debug = setup.testing)

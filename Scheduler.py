@@ -7,6 +7,7 @@ import threading
 import psutil
 import sqlite3
 import queue
+import re
 
 print('loading custom libraries')
 import sys
@@ -205,8 +206,8 @@ while True:
     tasks = get_tasks()
 
     # Safely assume columns that we need
-    cols  = ['name', 'execute', 'path', 'script', 'interval', 'delay', 'enabled', 'timeout', 'status', 'lastrun']
-    types = [str, str, str, str, safedelta, safedelta, bool, safedelta, str, safetime]
+    cols  = ['name', 'execute', 'path', 'script', 'timing', 'delay', 'enabled', 'timeout', 'status', 'lastrun']
+    types = [str, str, str, str, str, safedelta, bool, safedelta, str, safetime]
     tasks = handy.havecols(tasks, cols, fill = '', types = types)
     
     # Cycle
@@ -214,22 +215,46 @@ while True:
     tasks = tasks.assign(timeout = tasks.timeout.apply(lambda t: t.total_seconds()))
     tasks = tasks.assign(timeout = tasks.timeout.astype(int))
 
+    # Compute execution policy by timing
+    def replicate_by_timing(task):
+        # task = tasks.iloc[1]
+        timings = re.findall('([*-]|[0-9]{1,2}:[0-9]{2}|[0-9]{1,2} ?h|[0-9]{1,2} ?min|[0-9]{1,2} ?s)+', task['timing'], re.IGNORECASE)
+        replicates = pd.concat([task] * len(timings), axis = 1).transpose()
+        replicates['timing'] = timings
+        return replicates
+
+    tasks = [replicate_by_timing(row) for i, row in tasks.iterrows()]
+    tasks = pd.concat(tasks)
+    
+    # Determine execution policy per row
+    idx_disabled   = tasks.timing.str.match('\\-')
+    idx_continuous = tasks.timing.str.match('\\*')
+    idx_clocked    = tasks.timing.str.match('[0-9]{1,2}:[0-9]{2}')
+    idx_interval   = tasks.timing.str.match('[0-9]{1,2} ?h|[0-9]{1,2} ?min|[0-9]{1,2} ?s')
+    
+    # Execute clocked tasks
+    do1 = tasks[idx_clocked]
+    do1 = do1.assign(this_cycle = do1.cycle)
+    do1 = do1.assign(next_cycle = do1.timing.apply(pd.Timestamp, tz = 'CET') + do1.delay)
+    do1 = do1.assign(next_cycle = do1.next_cycle.apply(lambda t: t.floor(clock)))
+    do1 = do1.query('next_cycle == this_cycle')
+    
     # Execute interval tasks
-    interval = tasks.query('execute == "interval"')
-    interval = interval.assign(this_cycle = interval.cycle)
-    interval = interval.assign(this_cycle = interval.this_cycle.apply(pd.Timestamp))
-    interval = interval.assign(closest_cycle = interval.interval.apply(lambda interval: cycle.floor(interval)))
-    interval = interval.assign(next_cycle = (interval.closest_cycle + interval.delay).apply(lambda t: t.floor(clock)))
-    interval = interval.query('next_cycle == this_cycle')
+    do2 = tasks[idx_interval]
+    do2 = do2.assign(this_cycle = do2.cycle)
+    do2 = do2.assign(this_cycle = do2.this_cycle.apply(pd.Timestamp))
+    do2 = do2.assign(closest_cycle = do2.timing.apply(lambda interval: cycle.floor(interval)))
+    do2 = do2.assign(next_cycle = (do2.closest_cycle + do2.delay).apply(lambda t: t.floor(clock)))
+    do2 = do2.query('next_cycle == this_cycle')
 
     # Start continuous tasks
-    continuous = tasks.query('execute == "continuous"')
-    continuous = continuous.assign(pid = continuous.name.apply(get_pid))
-    continuous = continuous.query('pid == -1')
+    do3 = tasks[idx_continuous]
+    do3 = do3.assign(pid = do3.name.apply(get_pid))
+    do3 = do3.query('pid == -1')
     
     # Combine and start threads
     cols = ['cycle', 'name', 'path', 'script', 'timeout']
-    runnow = pd.concat([interval.filter(cols), continuous.filter(cols)])
+    runnow = pd.concat([do1, do2, do3]).filter(cols)
     for i, task in runnow.iterrows():
         cycle, name, path, script, timeout = task[cols].to_dict().values()
         print(f'    Running: {name}')

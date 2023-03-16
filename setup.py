@@ -33,7 +33,8 @@ binaries = {
     'ipynb': [r'C:\Users\nabi\AppData\Local\Programs\Python\Python310\Scripts\jupyter.exe', 'nbconvert', '--execute', '--to', 'notebook', '--inplace'],
     #'r':     [r'C:\Apps\R-Open-3.4.0\bin\x64\Rscript.exe'],
     #'m':     [r'C:\Projects\Python\Scheduler\matlab.bat'],
-    'bat':   [r'C:\Windows\System32\cmd.exe', '/C']
+    'bat':   [r'C:\Windows\System32\cmd.exe', '/C'],
+    #'sh':    [r'C:\Program Files\Git\git-bash.exe'],
 }
 
 for binary in binaries.values():
